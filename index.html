@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+/*formato de las sub-unidades*/
+.subunit.SCT { fill: #ddc; }
+.subunit.WLS { fill: #cdd; }
+.subunit.NIR { fill: #cdc; }
+.subunit.ENG { fill: #dcd; }
+.subunit.IRL { display: none; }
+
+/*fronteras*/
+.subunit-boundary {
+  fill: none;
+  stroke: #777;
+  stroke-dasharray: 2,2;
+  stroke-linejoin: round;
+}
+
+/*frontera Irlanda*/
+.subunit-boundary.IRL {
+  stroke: #aaa;
+}
+
+/*Etiquetas de las sub-unidaddes*/
+.subunit-label {
+  fill: #777;
+  fill-opacity: .5;
+  font-size: 25px;
+  font-weight: 300;
+  text-anchor: middle;
+}
+
+/*Marcadores*/
+.place,
+.place-label {
+  fill: #777373;
+}
+
+/*Fuente. Si el sistema no encuentra la primera, pasa a la segunda, etc*/
+text {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  pointer-events: none;
+}
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script>
+
+//Tamaño del mapa
+var width = 960,
+    height = 1160;
+
+//Fijamos el método de proyección de la información geográfica. Alternativas:Mercator, Albers, conic equal area, conic conformal,...
+//See https://github.com/mbostock/d3/wiki/Geo-Projections
+var projection = d3.geo.albers()
+    .center([0, 55.4])
+    .rotate([4.4, 0])
+    .parallels([50, 60])
+    .scale(1200 * 5)
+    .translate([width / 2, height / 2]);
+
+//Asignamos el path. Path le dice como tiene que transformar los datos. En este caso, con qué tipo de proyección
+var path = d3.geo.path()
+    .projection(projection);
+
+//Asignamos el tipo de imagen. Puede ser: svg, canvas
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+//Llamamos a los datos. More at http://bost.ocks.org/mike/map/
+d3.json("uk.json", function(error, uk) {
+  //Asignamos path a cada una de las sub-unidades
+  svg.selectAll(".subunit")
+  //transformamos topoJSON to GeoJSON
+      .data(topojson.feature(uk, uk.objects.subunits).features)
+    .enter().append("path")
+      .attr("class", function(d) { return "subunit " + d.id; })
+      .attr("d", path);
+	  
+     //Identificamos la boundary de Irlanda
+	 svg.append("path")
+    .datum(topojson.mesh(uk, uk.objects.subunits, function(a, b) { return a !== b && a.id !== "IRL"; }))
+    .attr("d", path)
+    .attr("class", "subunit-boundary");
+	
+	//Dejamos sólo el controno
+	svg.append("path")
+    //transformamos topoJSON to GeoJSON
+	.datum(topojson.mesh(uk, uk.objects.subunits, function(a, b) { return a === b && a.id === "IRL"; }))
+    .attr("d", path)
+    .attr("class", "subunit-boundary IRL");
+	
+	//Creamos marcadores
+	svg.append("path")
+	//transformamos topoJSON to GeoJSON
+    .datum(topojson.feature(uk, uk.objects.places))
+	//Modificamos el radio del marcador(4,5 por defecto)
+	.attr("d", path.pointRadius(3))
+    .attr("d", path)
+    .attr("class", "place");
+	
+	//Añadimos texto a los marcadores
+	svg.selectAll(".place-label")
+	//transformamos topoJSON to GeoJSON
+    .data(topojson.feature(uk, uk.objects.places).features)
+    .enter().append("text")
+    .attr("class", "place-label")
+    .attr("transform", function(d) { return "translate(" + projection(d.geometry.coordinates) + ")"; })
+    .attr("dy", ".35em")
+    .text(function(d) { return d.properties.name; });
+	
+	// right-aligned labels on the left side of the map, and left-aligned labels on the right side of the map
+	svg.selectAll(".place-label")
+    .attr("x", function(d) { return d.geometry.coordinates[0] > -1 ? 6 : -6; })
+    .style("text-anchor", function(d) { return d.geometry.coordinates[0] > -1 ? "start" : "end"; });
+	
+	//Country labels
+	svg.selectAll(".subunit-label")
+	//transformamos topoJSON to GeoJSON
+    .data(topojson.feature(uk, uk.objects.subunits).features)
+    .enter().append("text")
+    .attr("class", function(d) { return "subunit-label " + d.id; })
+    .attr("transform", function(d) { return "translate(" + path.centroid(d) + ")"; })
+    .attr("dy", ".35em")
+    .text(function(d) { return d.properties.name; });
+});
+
+</script>
